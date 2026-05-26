@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图片展示库 | BG Sites</title>
+  <meta name="description" content="从 Google Drive 云端文件夹中展示分类图片，支持按类别筛选浏览">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="32" height="32" rx="8" fill="url(#grad1)"/>
+          <path d="M8 22l6-8 4 5 3-4 5 7H8z" fill="white" opacity="0.9"/>
+          <circle cx="22" cy="11" r="3" fill="white" opacity="0.9"/>
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#667eea"/>
+              <stop offset="100%" stop-color="#764ba2"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">图片展示库</span>
+      </div>
+      <div class="header-actions">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="searchInput" placeholder="搜索图片名称…" autocomplete="off">
+        </div>
+        <button class="config-btn" id="configBtn" title="配置 Google Drive 文件夹">
+          <svg viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Config Modal -->
+  <div class="modal-overlay" id="configModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>配置 Google Drive</h2>
+        <button class="modal-close" id="modalClose">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">请输入 Google Drive 根文件夹 ID，以及你的 Google API Key。<br>文件夹的第一层子文件夹将作为图片分类。</p>
+        <div class="form-group">
+          <label for="folderIdInput">根文件夹 ID</label>
+          <input type="text" id="folderIdInput" placeholder="例如：1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
+          <span class="form-hint">从 Google Drive 文件夹链接中复制 ID</span>
+        </div>
+        <div class="form-group">
+          <label for="apiKeyInput">Google API Key</label>
+          <input type="password" id="apiKeyInput" placeholder="AIza...">
+          <span class="form-hint">需要开启 Google Drive API</span>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelBtn">取消</button>
+          <button class="btn-primary" id="saveConfigBtn">保存并加载</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Filter Bar -->
+    <div class="filter-section">
+      <div class="filter-header">
+        <h1 class="filter-title">图片分类</h1>
+        <span class="image-count" id="imageCount">— 张图片</span>
+      </div>
+      <div class="filter-tabs" id="filterTabs">
+        <button class="filter-tab active" data-category="all" id="tab-all">
+          <span class="tab-icon">🖼️</span>
+          全部
+        </button>
+        <!-- Dynamic category tabs will be injected here -->
+      </div>
+    </div>
+
+    <!-- Gallery Grid -->
+    <div class="gallery-container">
+      <!-- Loading State -->
+      <div class="loading-state" id="loadingState">
+        <div class="spinner"></div>
+        <p>正在加载图片…</p>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyState" style="display:none">
+        <div class="empty-icon">
+          <svg viewBox="0 0 80 80" fill="none">
+            <rect x="10" y="20" width="60" height="45" rx="4" stroke="#667eea" stroke-width="2" fill="none" opacity="0.4"/>
+            <circle cx="28" cy="36" r="5" stroke="#667eea" stroke-width="2" opacity="0.4"/>
+            <path d="M10 52l16-14 10 12 8-10 16 15" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+          </svg>
+        </div>
+        <h3>尚未配置</h3>
+        <p>点击右上角的设置按钮，输入 Google Drive 文件夹 ID 和 API Key 开始使用。</p>
+        <button class="btn-primary" id="openConfigBtn">立即配置</button>
+      </div>
+
+      <!-- No Results State -->
+      <div class="no-results-state" id="noResultsState" style="display:none">
+        <div class="empty-icon">
+          <svg viewBox="0 0 80 80" fill="none">
+            <circle cx="35" cy="35" r="20" stroke="#667eea" stroke-width="2" opacity="0.5"/>
+            <path d="M49 49L65 65" stroke="#667eea" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+            <path d="M28 35h14M35 28v14" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" opacity="0.6" transform="rotate(45 35 35)"/>
+          </svg>
+        </div>
+        <h3>没有找到图片</h3>
+        <p>尝试其他分类或搜索词</p>
+      </div>
+
+      <!-- Image Grid -->
+      <div class="image-grid" id="imageGrid"></div>
+    </div>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose">×</button>
+    <button class="lightbox-nav lightbox-prev" id="lightboxPrev">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button class="lightbox-nav lightbox-next" id="lightboxNext">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="lightbox-content">
+      <img class="lightbox-img" id="lightboxImg" src="" alt="">
+      <div class="lightbox-info">
+        <span class="lightbox-category" id="lightboxCategory"></span>
+        <h3 class="lightbox-title" id="lightboxTitle"></h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

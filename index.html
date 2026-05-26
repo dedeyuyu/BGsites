@@ -12,9 +12,10 @@
 </head>
 <body>
 
-  <!-- ── Top Navigation ── -->
+  <!-- ── Navigation ── -->
   <header class="nav" id="nav">
     <div class="nav-inner">
+      <!-- Logo -->
       <div class="nav-logo">
         <svg class="nav-logo-mark" width="24" height="24" viewBox="0 0 24 24" fill="none">
           <rect width="24" height="24" rx="6" fill="url(#lg)"/>
@@ -30,18 +31,56 @@
         <span class="nav-logo-text">BG Reference</span>
       </div>
 
-      <nav class="nav-cats" id="navCats" role="navigation" aria-label="图片分类">
-        <!-- Injected by JS -->
-      </nav>
+      <!-- Right actions -->
+      <div class="nav-right">
+        <!-- Category toggle button -->
+        <button class="cat-toggle-btn" id="catToggleBtn" aria-expanded="false" aria-controls="catPanel" style="display:none">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M1 3h13M3 7.5h9M5.5 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span id="catToggleLabel">分类筛选</span>
+          <span class="cat-badge" id="catBadge" style="display:none">0</span>
+          <svg class="cat-chevron" id="catChevron" width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M2.5 4.5L6.5 8.5L10.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
 
-      <button class="nav-settings" id="navSettings" aria-label="配置">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-      </button>
+        <!-- Refresh cache button -->
+        <button class="nav-icon-btn" id="refreshBtn" title="刷新图片列表" style="display:none" aria-label="刷新">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M13 7A6 6 0 101 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M13 3v4h-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <!-- Settings -->
+        <button class="nav-icon-btn" id="navSettings" aria-label="配置">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </header>
+
+  <!-- ── Category Panel (slides down from nav) ── -->
+  <div class="cat-panel" id="catPanel" aria-hidden="true">
+    <div class="cat-panel-inner">
+      <div class="cat-chips-wrap" id="catChipsWrap">
+        <!-- Chips injected by JS -->
+      </div>
+      <div class="cat-panel-foot">
+        <button class="cat-clear-btn" id="catClearBtn">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          清除筛选
+        </button>
+        <span class="cat-result-count" id="catResultCount"></span>
+      </div>
+    </div>
+  </div>
+  <!-- Panel backdrop (click to close) -->
+  <div class="cat-backdrop" id="catBackdrop"></div>
 
   <!-- ── Config Modal ── -->
   <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -49,10 +88,10 @@
       <div class="modal-head">
         <p class="modal-title" id="modalTitle">配置 Google Drive</p>
         <button class="modal-x" id="modalX" aria-label="关闭">
-          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </button>
       </div>
-      <p class="modal-hint">输入 Google Drive 根文件夹 ID 与 API Key。第一层子文件夹自动成为分类标签。</p>
+      <p class="modal-hint">输入 Google Drive 根文件夹 ID 与 API Key。第一层子文件夹自动成为分类。</p>
       <label class="field">
         <span class="field-label">根文件夹 ID</span>
         <input id="cfgFolder" type="text" class="field-input" placeholder="1BxiMVs0XRA5nFMd…" autocomplete="off" spellcheck="false">
@@ -75,14 +114,13 @@
 
   <!-- ── Main ── -->
   <main class="main" id="main">
-
-    <!-- Empty / not-configured state -->
-    <div class="state-empty" id="stateEmpty">
+    <!-- Empty -->
+    <div class="state-box" id="stateEmpty">
       <div class="state-icon">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <rect x="6" y="12" width="36" height="28" rx="3" stroke="rgba(255,255,255,.2)" stroke-width="1.5"/>
-          <circle cx="17" cy="23" r="4" stroke="rgba(255,255,255,.2)" stroke-width="1.5"/>
-          <path d="M6 32l10-9 7 8 6-7 13 9.5" stroke="rgba(255,255,255,.2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="5" y="11" width="34" height="26" rx="3" stroke="rgba(255,255,255,.22)" stroke-width="1.4"/>
+          <circle cx="15" cy="21" r="3.5" stroke="rgba(255,255,255,.22)" stroke-width="1.4"/>
+          <path d="M5 30l9-8 6 7 5.5-6 12.5 8.5" stroke="rgba(255,255,255,.22)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
       <p class="state-title">尚未配置</p>
@@ -90,33 +128,33 @@
       <button class="btn-primary" id="stateBtn">立即配置</button>
     </div>
 
-    <!-- Loading state -->
-    <div class="state-loading" id="stateLoading" style="display:none">
-      <div class="loading-bar"><div class="loading-bar-fill" id="loadBar"></div></div>
-      <p class="state-desc" id="loadLabel">正在加载…</p>
+    <!-- Loading -->
+    <div class="state-box" id="stateLoading" style="display:none">
+      <div class="loading-track"><div class="loading-fill" id="loadFill"></div></div>
+      <p class="state-desc" id="loadLabel">正在连接 Google Drive…</p>
     </div>
 
     <!-- No results -->
-    <div class="state-empty" id="stateNone" style="display:none">
+    <div class="state-box" id="stateNone" style="display:none">
       <p class="state-title">没有图片</p>
-      <p class="state-desc">当前分类暂无内容，试试其他标签</p>
+      <p class="state-desc">当前筛选条件下无图片，试试其他分类</p>
+      <button class="btn-ghost" id="clearFilterBtn">清除筛选</button>
     </div>
 
-    <!-- Masonry grid -->
-    <div class="masonry" id="masonry"></div>
-
+    <!-- Grid -->
+    <div class="masonry" id="masonry" style="display:none"></div>
   </main>
 
-  <!-- Lightbox -->
+  <!-- ── Lightbox ── -->
   <div class="lb" id="lb">
     <button class="lb-close" id="lbClose" aria-label="关闭">
-      <svg width="16" height="16" viewBox="0 0 16 16"><path d="M1 1l14 14M15 1L1 15" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 1l12 12M13 1L1 13" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
     </button>
     <button class="lb-nav lb-prev" id="lbPrev" aria-label="上一张">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 14L5 9l6-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 13L4 8l6-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <button class="lb-nav lb-next" id="lbNext" aria-label="下一张">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 14l6-5-6-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 13l6-5-6-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <img class="lb-img" id="lbImg" src="" alt="">
     <div class="lb-info">

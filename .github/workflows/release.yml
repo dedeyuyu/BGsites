@@ -1,0 +1,62 @@
+name: Release with Attestation
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Build release artifact
+        run: |
+          mkdir -p dist
+          zip -r dist/BGsites-${{ steps.version.outputs.VERSION }}.zip \
+            index.html style.css app.js README.md \
+            --exclude "*.git*"
+          echo "Built: dist/BGsites-${{ steps.version.outputs.VERSION }}.zip"
+          sha256sum dist/BGsites-${{ steps.version.outputs.VERSION }}.zip
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/BGsites-${{ steps.version.outputs.VERSION }}.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: "BGsites ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## BGsites ${{ steps.version.outputs.VERSION }}
+
+            Google Drive 图片展示库 — 发布包含完整构建证明（SLSA v1.0 Provenance）。
+
+            ### 包含文件
+            - `index.html` — 主页面
+            - `style.css` — 样式表
+            - `app.js` — 应用逻辑
+            - `README.md` — 说明文档
+
+            ### 验证构建证明
+            ```bash
+            gh attestation verify BGsites-${{ steps.version.outputs.VERSION }}.zip \
+              --repo dedeyuyu/BGsites
+            ```
+          files: dist/BGsites-${{ steps.version.outputs.VERSION }}.zip
+          draft: false
+          prerelease: false

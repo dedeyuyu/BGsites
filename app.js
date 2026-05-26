@@ -1,434 +1,466 @@
 /**
- * BG Sites — Google Drive Image Gallery
- * Main Application Logic
+ * BG Reference — Google Drive Image Gallery
+ * Immersive Minimalism Design
  */
 
+// ─── Config ───────────────────────────────────────────────────────────
+const DRIVE = 'https://www.googleapis.com/drive/v3';
+const BATCH = 200;           // files per API page
+const SKELETON_COUNT = 12;   // skeleton cards shown on initial load
+
 // ─── State ────────────────────────────────────────────────────────────
-const state = {
+const S = {
   folderId: '',
   apiKey: '',
-  categories: [],       // [{ id, name, emoji }]
-  images: [],           // [{ id, name, category, categoryId, thumbUrl, viewUrl }]
-  filtered: [],         // currently visible images
-  activeCategory: 'all',
-  searchQuery: '',
-  lightboxIndex: -1,
-  loading: false,
+  categories: [],  // [{id,name}]
+  images: [],      // [{id,name,category,categoryId,w,h}]
+  filtered: [],
+  activeCat: 'all',
+  lbIndex: -1,
 };
 
-// Emoji palette for categories
-const EMOJIS = ['🌟','🎨','🌸','🔥','💎','🌈','🎭','🦋','🌙','⚡','🎪','🌺','🍀','🦄','🎯','🌊'];
-
-// ─── DOM refs ─────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const els = {
-  configBtn:       $('configBtn'),
-  configModal:     $('configModal'),
-  modalClose:      $('modalClose'),
-  cancelBtn:       $('cancelBtn'),
-  saveConfigBtn:   $('saveConfigBtn'),
-  folderIdInput:   $('folderIdInput'),
-  apiKeyInput:     $('apiKeyInput'),
-  openConfigBtn:   $('openConfigBtn'),
-  filterTabs:      $('filterTabs'),
-  imageGrid:       $('imageGrid'),
-  imageCount:      $('imageCount'),
-  loadingState:    $('loadingState'),
-  emptyState:      $('emptyState'),
-  noResultsState:  $('noResultsState'),
-  searchInput:     $('searchInput'),
-  lightbox:        $('lightbox'),
-  lightboxClose:   $('lightboxClose'),
-  lightboxPrev:    $('lightboxPrev'),
-  lightboxNext:    $('lightboxNext'),
-  lightboxImg:     $('lightboxImg'),
-  lightboxCategory:$('lightboxCategory'),
-  lightboxTitle:   $('lightboxTitle'),
-  toast:           $('toast'),
+// ─── DOM ──────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const el = {
+  nav:         $('nav'),
+  navCats:     $('navCats'),
+  navSettings: $('navSettings'),
+  overlay:     $('overlay'),
+  modalX:      $('modalX'),
+  modalCancel: $('modalCancel'),
+  modalSave:   $('modalSave'),
+  cfgFolder:   $('cfgFolder'),
+  cfgKey:      $('cfgKey'),
+  toast:       $('toast'),
+  main:        $('main'),
+  stateEmpty:  $('stateEmpty'),
+  stateLoading:$('stateLoading'),
+  stateNone:   $('stateNone'),
+  stateBtn:    $('stateBtn'),
+  loadBar:     $('loadBar'),
+  loadLabel:   $('loadLabel'),
+  masonry:     $('masonry'),
+  lb:          $('lb'),
+  lbClose:     $('lbClose'),
+  lbPrev:      $('lbPrev'),
+  lbNext:      $('lbNext'),
+  lbImg:       $('lbImg'),
+  lbCat:       $('lbCat'),
+  lbName:      $('lbName'),
 };
 
 // ─── Persistence ──────────────────────────────────────────────────────
-function loadConfig() {
-  state.folderId = localStorage.getItem('drive_folder_id') || '';
-  state.apiKey   = localStorage.getItem('drive_api_key')   || '';
+function loadCfg() {
+  S.folderId = localStorage.getItem('bg_folder') || '';
+  S.apiKey   = localStorage.getItem('bg_key')    || '';
 }
-
-function saveConfig() {
-  localStorage.setItem('drive_folder_id', state.folderId);
-  localStorage.setItem('drive_api_key',   state.apiKey);
+function saveCfg() {
+  localStorage.setItem('bg_folder', S.folderId);
+  localStorage.setItem('bg_key',    S.apiKey);
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────
-let toastTimer;
-function showToast(msg, type = '') {
-  clearTimeout(toastTimer);
-  els.toast.textContent = msg;
-  els.toast.className = `toast show ${type}`;
-  toastTimer = setTimeout(() => { els.toast.className = 'toast'; }, 3000);
+let _toastTimer;
+function toast(msg) {
+  clearTimeout(_toastTimer);
+  el.toast.textContent = msg;
+  el.toast.classList.add('show');
+  _toastTimer = setTimeout(() => el.toast.classList.remove('show'), 2000);
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────
 function openModal() {
-  els.folderIdInput.value = state.folderId;
-  els.apiKeyInput.value   = state.apiKey;
-  els.configModal.classList.add('open');
+  el.cfgFolder.value = S.folderId;
+  el.cfgKey.value    = S.apiKey;
+  el.overlay.classList.add('open');
+  setTimeout(() => el.cfgFolder.focus(), 100);
+}
+function closeModal() { el.overlay.classList.remove('open'); }
+
+// ─── States ───────────────────────────────────────────────────────────
+function showState(name) {
+  el.stateEmpty.style.display   = name === 'empty'   ? 'flex' : 'none';
+  el.stateLoading.style.display = name === 'loading' ? 'flex' : 'none';
+  el.stateNone.style.display    = name === 'none'    ? 'flex' : 'none';
+  el.masonry.style.display      = name === 'grid'    ? ''     : 'none';
 }
 
-function closeModal() {
-  els.configModal.classList.remove('open');
+function setProgress(pct, label) {
+  el.loadBar.style.width = pct + '%';
+  if (label) el.loadLabel.textContent = label;
 }
 
 // ─── Google Drive API ─────────────────────────────────────────────────
-const DRIVE_API = 'https://www.googleapis.com/drive/v3';
-const IMG_MIME  = ['image/jpeg','image/png','image/gif','image/webp','image/svg+xml'].join(',');
-
-async function driveRequest(endpoint, params = {}) {
-  const url = new URL(DRIVE_API + endpoint);
-  url.searchParams.set('key', state.apiKey);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
+async function driveGet(path, params = {}) {
+  const url = new URL(DRIVE + path);
+  url.searchParams.set('key', S.apiKey);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  const r = await fetch(url);
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e?.error?.message || `Drive API error ${r.status}`);
   }
-  return res.json();
+  return r.json();
 }
 
-async function fetchSubfolders(parentId) {
-  const data = await driveRequest('/files', {
+async function getSubfolders(parentId) {
+  const d = await driveGet('/files', {
     q: `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id,name)',
-    pageSize: 100,
+    pageSize: 200,
     orderBy: 'name',
   });
-  return data.files || [];
+  return d.files || [];
 }
 
-async function fetchImagesInFolder(folderId) {
-  const all = [];
-  let pageToken = '';
+async function* streamImages(folderId) {
+  let token = '';
   do {
     const params = {
       q: `'${folderId}' in parents and mimeType contains 'image/' and trashed=false`,
-      fields: 'nextPageToken,files(id,name,mimeType,thumbnailLink,webContentLink,webViewLink)',
-      pageSize: 100,
+      fields: 'nextPageToken,files(id,name,imageMediaMetadata)',
+      pageSize: BATCH,
     };
-    if (pageToken) params.pageToken = pageToken;
-    const data = await driveRequest('/files', params);
-    all.push(...(data.files || []));
-    pageToken = data.nextPageToken || '';
-  } while (pageToken);
-  return all;
+    if (token) params.pageToken = token;
+    const d = await driveGet('/files', params);
+    yield d.files || [];
+    token = d.nextPageToken || '';
+  } while (token);
 }
 
-function thumbUrl(file) {
-  // Use thumbnailLink if present, else construct from file ID
-  if (file.thumbnailLink) return file.thumbnailLink.replace('=s220', '=s400');
-  return `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
-}
-
-function viewUrl(file) {
-  return `https://drive.google.com/file/d/${file.id}/view`;
-}
-
-// ─── Load Data ────────────────────────────────────────────────────────
+// ─── Load Gallery ─────────────────────────────────────────────────────
 async function loadGallery() {
-  if (!state.folderId || !state.apiKey) {
-    showEmptyState();
-    return;
-  }
+  if (!S.folderId || !S.apiKey) { showState('empty'); return; }
 
-  state.loading = true;
-  showLoadingState();
-  state.categories = [];
-  state.images = [];
+  S.images     = [];
+  S.categories = [];
+  S.activeCat  = 'all';
+  showState('loading');
+  setProgress(5, '正在连接 Google Drive…');
 
   try {
-    // 1. Get subfolders (categories)
-    const folders = await fetchSubfolders(state.folderId);
+    // 1. Subfolders → categories
+    const folders = await getSubfolders(S.folderId);
+    setProgress(15, `发现 ${folders.length} 个分类…`);
 
-    if (folders.length === 0) {
-      // No subfolders — load images directly from root
-      const files = await fetchImagesInFolder(state.folderId);
-      state.categories = [{ id: state.folderId, name: '全部图片', emoji: '🖼️' }];
-      state.images = files.map(f => ({
-        id: f.id,
-        name: f.name.replace(/\.[^.]+$/, ''),
-        category: '全部图片',
-        categoryId: state.folderId,
-        thumbUrl: thumbUrl(f),
-        viewUrl: viewUrl(f),
-      }));
-    } else {
-      // 2. Fetch images from each subfolder (category)
-      state.categories = folders.map((f, i) => ({
-        id: f.id,
-        name: f.name,
-        emoji: EMOJIS[i % EMOJIS.length],
-      }));
+    const targets = folders.length
+      ? folders.map(f => ({ id: f.id, name: f.name }))
+      : [{ id: S.folderId, name: '全部' }];
 
-      const results = await Promise.allSettled(
-        state.categories.map(cat => fetchImagesInFolder(cat.id))
-      );
+    S.categories = targets;
 
-      results.forEach((result, i) => {
-        if (result.status === 'fulfilled') {
-          const cat = state.categories[i];
-          result.value.forEach(f => {
-            state.images.push({
-              id: f.id,
-              name: f.name.replace(/\.[^.]+$/, ''),
-              category: cat.name,
-              categoryId: cat.id,
-              thumbUrl: thumbUrl(f),
-              viewUrl: viewUrl(f),
-            });
+    // 2. Stream images from each category
+    let catDone = 0;
+    for (const cat of targets) {
+      for await (const batch of streamImages(cat.id)) {
+        batch.forEach(f => {
+          const meta = f.imageMediaMetadata || {};
+          S.images.push({
+            id:         f.id,
+            name:       f.name.replace(/\.[^.]+$/, ''),
+            category:   cat.name,
+            categoryId: cat.id,
+            w:          meta.width  || 0,
+            h:          meta.height || 0,
           });
+        });
+        // Render partial results while loading
+        if (S.images.length > 0 && el.masonry.childElementCount === 0) {
+          showState('grid');
+          renderGrid(S.images, false);
         }
-      });
+      }
+      catDone++;
+      const pct = 15 + Math.round((catDone / targets.length) * 80);
+      setProgress(pct, `已加载 ${S.images.length} 张图片…`);
     }
 
-    state.activeCategory = 'all';
-    state.searchQuery = '';
-    els.searchInput.value = '';
-    renderFilterTabs();
-    applyFilters();
-    showToast(`✅ 已加载 ${state.images.length} 张图片`, 'success');
+    setProgress(100, `完成！共 ${S.images.length} 张图片`);
+
+    S.filtered = [...S.images];
+    renderNav();
+    renderGrid(S.filtered, true);
+    showState('grid');
+    toast(`✓ 已加载 ${S.images.length} 张图片`);
 
   } catch (err) {
     console.error(err);
-    showToast(`❌ 加载失败：${err.message}`, 'error');
-    showEmptyState();
-  } finally {
-    state.loading = false;
+    toast(`⚠ 加载失败：${err.message}`);
+    showState('empty');
   }
 }
 
-// ─── Filter & Search ──────────────────────────────────────────────────
-function applyFilters() {
-  const q = state.searchQuery.toLowerCase().trim();
-  const cat = state.activeCategory;
+// ─── Filter ───────────────────────────────────────────────────────────
+function filter(catId) {
+  S.activeCat = catId;
 
-  state.filtered = state.images.filter(img => {
-    const matchCat  = cat === 'all' || img.categoryId === cat;
-    const matchSearch = !q || img.name.toLowerCase().includes(q) || img.category.toLowerCase().includes(q);
-    return matchCat && matchSearch;
+  // Update active tab
+  el.navCats.querySelectorAll('.cat-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.cat === catId);
   });
 
-  renderGrid();
-  updateCount();
+  S.filtered = catId === 'all'
+    ? [...S.images]
+    : S.images.filter(i => i.categoryId === catId);
+
+  // Animate grid swap
+  el.masonry.classList.add('fade-out');
+  setTimeout(() => {
+    renderGrid(S.filtered, true);
+    el.masonry.classList.remove('fade-out');
+    el.masonry.classList.add('fade-in');
+    setTimeout(() => el.masonry.classList.remove('fade-in'), 350);
+  }, 200);
 }
 
-function updateCount() {
-  const total = state.filtered.length;
-  els.imageCount.textContent = `${total} 张图片`;
-}
+// ─── Render Nav ───────────────────────────────────────────────────────
+function renderNav() {
+  el.navCats.innerHTML = '';
 
-// ─── Render ───────────────────────────────────────────────────────────
-function renderFilterTabs() {
-  // Keep "All" tab, remove old category tabs
-  const allTab = $('tab-all');
-  // Remove extra tabs
-  Array.from(els.filterTabs.querySelectorAll('.filter-tab:not(#tab-all)')).forEach(t => t.remove());
+  const all = makeTabBtn('all', `全部 · ${S.images.length}`);
+  all.classList.add('active');
+  el.navCats.appendChild(all);
 
-  // Update "All" tab count
-  allTab.innerHTML = `<span class="tab-icon">🖼️</span> 全部 <span class="tab-count">${state.images.length}</span>`;
-
-  // Add category tabs
-  state.categories.forEach(cat => {
-    const count = state.images.filter(i => i.categoryId === cat.id).length;
-    const btn = document.createElement('button');
-    btn.className = 'filter-tab';
-    btn.dataset.category = cat.id;
-    btn.id = `tab-${cat.id}`;
-    btn.innerHTML = `<span class="tab-icon">${cat.emoji}</span>${cat.name}<span class="tab-count">${count}</span>`;
-    btn.addEventListener('click', () => setCategory(cat.id));
-    els.filterTabs.appendChild(btn);
+  S.categories.forEach(cat => {
+    const count = S.images.filter(i => i.categoryId === cat.id).length;
+    el.navCats.appendChild(makeTabBtn(cat.id, `${cat.name} · ${count}`));
   });
 }
 
-function setCategory(catId) {
-  state.activeCategory = catId;
-  els.filterTabs.querySelectorAll('.filter-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.category === catId);
-  });
-  applyFilters();
+function makeTabBtn(catId, label) {
+  const b = document.createElement('button');
+  b.className = 'cat-btn';
+  b.dataset.cat = catId;
+  b.textContent = label;
+  b.addEventListener('click', () => filter(catId));
+  return b;
 }
 
-function renderGrid() {
-  els.imageGrid.innerHTML = '';
-  hideAllStates();
+// ─── Render Grid ──────────────────────────────────────────────────────
+// Lazy load via IntersectionObserver
+const imgObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const card = entry.target;
+    const imgEl = card.querySelector('.card-img');
+    if (!imgEl || imgEl.dataset.loaded) return;
+    imgEl.dataset.loaded = '1';
+    const src = imgEl.dataset.src;
+    imgEl.src = src;
+    imgObserver.unobserve(card);
+  });
+}, { rootMargin: '300px' });
 
-  if (state.images.length === 0) {
-    showEmptyState();
-    return;
+function renderGrid(images, full = true) {
+  el.masonry.innerHTML = '';
+
+  if (!images.length) { showState('none'); return; }
+
+  // Show skeleton cards first if full render
+  if (full && images.length > SKELETON_COUNT) {
+    const skeletonCount = Math.min(SKELETON_COUNT, images.length);
+    for (let i = 0; i < skeletonCount; i++) {
+      const h = 120 + Math.floor(Math.random() * 160);
+      const sk = document.createElement('div');
+      sk.className = 'card card-skeleton';
+      sk.style.height = h + 'px';
+      el.masonry.appendChild(sk);
+    }
+    // Replace skeletons with real cards after tiny delay
+    setTimeout(() => buildCards(images), 50);
+  } else {
+    buildCards(images);
   }
+}
 
-  if (state.filtered.length === 0) {
-    els.noResultsState.style.display = 'flex';
-    return;
-  }
+function buildCards(images) {
+  el.masonry.innerHTML = '';
+  const frag = document.createDocumentFragment();
 
-  els.imageGrid.style.display = 'grid';
+  images.forEach((img, idx) => {
+    const card = createCard(img, idx);
+    frag.appendChild(card);
+  });
 
-  state.filtered.forEach((img, idx) => {
-    const card = document.createElement('div');
-    card.className = 'image-card';
-    card.style.animationDelay = `${Math.min(idx * 40, 400)}ms`;
-    card.innerHTML = `
-      <div class="card-thumb">
-        <div class="card-thumb-loading">
-          <div class="spinner" style="width:24px;height:24px;border-width:2px;"></div>
-        </div>
-        <img src="${img.thumbUrl}" alt="${escHtml(img.name)}" loading="lazy">
-        <div class="card-overlay">
-          <div class="overlay-eye">
-            <svg viewBox="0 0 20 20" fill="none">
-              <ellipse cx="10" cy="10" rx="7" ry="4.5" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="10" cy="10" r="2" fill="currentColor"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-      <div class="card-info">
-        <div class="card-category">${escHtml(img.category)}</div>
-        <div class="card-name">${escHtml(img.name)}</div>
-      </div>
-    `;
+  el.masonry.appendChild(frag);
 
-    // Image load handlers
-    const imgEl = card.querySelector('img');
-    const loader = card.querySelector('.card-thumb-loading');
-    imgEl.addEventListener('load', () => { loader.style.display = 'none'; });
-    imgEl.addEventListener('error', () => {
-      loader.innerHTML = `<div class="card-thumb-error">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <rect x="4" y="6" width="24" height="20" rx="2" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M4 20l6-6 5 6 4-5 7 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <span>无法加载</span>
-      </div>`;
+  // Observe all cards
+  el.masonry.querySelectorAll('.card').forEach(c => imgObserver.observe(c));
+}
+
+function createCard(img, idx) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.idx = idx;
+
+  // Determine aspect ratio for skeleton placeholder
+  const aspectH = img.w && img.h
+    ? Math.round((img.h / img.w) * 100)
+    : (60 + Math.floor(Math.random() * 60)); // fallback random
+
+  const thumbSrc = `https://drive.google.com/thumbnail?id=${img.id}&sz=w600`;
+  const viewSrc  = `https://drive.google.com/thumbnail?id=${img.id}&sz=w1600`;
+
+  card.innerHTML = `
+    <div style="position:relative;padding-top:${aspectH}%;">
+      <img class="card-img loading"
+           data-src="${thumbSrc}"
+           alt="${esc(img.name)}"
+           style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"
+           loading="lazy">
+    </div>
+    <div class="card-overlay"></div>
+    <div class="card-tag">${esc(img.category)}</div>
+    <div class="card-actions">
+      <button class="card-btn btn-dl" title="下载" data-id="${img.id}" data-name="${esc(img.name)}">
+        ${iconDownload()}
+      </button>
+      <button class="card-btn btn-cp" title="复制链接" data-id="${img.id}">
+        ${iconLink()}
+      </button>
+    </div>
+  `;
+
+  // Image load → fade in
+  const imgEl = card.querySelector('.card-img');
+  imgEl.addEventListener('load',  () => imgEl.classList.replace('loading','loaded'));
+  imgEl.addEventListener('error', () => { imgEl.classList.replace('loading','loaded'); imgEl.style.opacity = '.3'; });
+
+  // Open lightbox on card click (not on buttons)
+  card.addEventListener('click', e => {
+    if (e.target.closest('.card-btn')) return;
+    S.lbIndex = idx;
+    openLb();
+  });
+
+  // Download
+  card.querySelector('.btn-dl').addEventListener('click', e => {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    btn.style.transform = 'scale(0.88)';
+    setTimeout(() => btn.style.transform = '', 200);
+    const a = document.createElement('a');
+    a.href = `https://drive.google.com/uc?export=download&id=${btn.dataset.id}`;
+    a.download = btn.dataset.name;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+
+  // Copy link
+  card.querySelector('.btn-cp').addEventListener('click', e => {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    btn.style.transform = 'scale(0.88)';
+    setTimeout(() => btn.style.transform = '', 200);
+    const url = `https://drive.google.com/file/d/${btn.dataset.id}/view`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast('🔗 链接已复制到剪贴板');
+    }).catch(() => {
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.cssText = 'position:fixed;opacity:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast('🔗 链接已复制到剪贴板');
     });
-
-    card.addEventListener('click', () => openLightbox(idx));
-    els.imageGrid.appendChild(card);
   });
-}
 
-function escHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ─── State Helpers ────────────────────────────────────────────────────
-function hideAllStates() {
-  els.loadingState.style.display  = 'none';
-  els.emptyState.style.display    = 'none';
-  els.noResultsState.style.display= 'none';
-  els.imageGrid.style.display     = 'none';
-}
-
-function showLoadingState() {
-  hideAllStates();
-  els.loadingState.style.display = 'flex';
-}
-
-function showEmptyState() {
-  hideAllStates();
-  els.emptyState.style.display = 'flex';
+  return card;
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────
-function openLightbox(idx) {
-  state.lightboxIndex = idx;
-  updateLightbox();
-  els.lightbox.classList.add('open');
+function openLb() {
+  const img = S.filtered[S.lbIndex];
+  if (!img) return;
+  el.lbImg.src = `https://drive.google.com/thumbnail?id=${img.id}&sz=w1600`;
+  el.lbImg.alt = img.name;
+  el.lbCat.textContent  = img.category;
+  el.lbName.textContent = img.name;
+  el.lb.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
-
-function closeLightbox() {
-  els.lightbox.classList.remove('open');
+function closeLb() {
+  el.lb.classList.remove('open');
   document.body.style.overflow = '';
-  state.lightboxIndex = -1;
 }
-
-function updateLightbox() {
-  const img = state.filtered[state.lightboxIndex];
-  if (!img) return;
-  els.lightboxImg.src = `https://drive.google.com/thumbnail?id=${img.id}&sz=w1200`;
-  els.lightboxImg.alt = img.name;
-  els.lightboxCategory.textContent = img.category;
-  els.lightboxTitle.textContent = img.name;
-}
-
-function lightboxNav(dir) {
-  const newIdx = state.lightboxIndex + dir;
-  if (newIdx < 0 || newIdx >= state.filtered.length) return;
-  state.lightboxIndex = newIdx;
-  els.lightboxImg.style.opacity = '0';
+function lbNav(dir) {
+  const next = S.lbIndex + dir;
+  if (next < 0 || next >= S.filtered.length) return;
+  S.lbIndex = next;
+  el.lbImg.style.opacity = '0';
+  el.lbImg.style.transform = 'scale(.95)';
   setTimeout(() => {
-    updateLightbox();
-    els.lightboxImg.style.opacity = '1';
-  }, 150);
+    openLb();
+    el.lbImg.style.opacity = '';
+    el.lbImg.style.transform = '';
+  }, 180);
 }
 
-// ─── Event Listeners ──────────────────────────────────────────────────
-// Config modal
-els.configBtn.addEventListener('click', openModal);
-els.openConfigBtn.addEventListener('click', openModal);
-els.modalClose.addEventListener('click', closeModal);
-els.cancelBtn.addEventListener('click', closeModal);
-els.configModal.addEventListener('click', e => { if (e.target === els.configModal) closeModal(); });
+// ─── Helpers ──────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-els.saveConfigBtn.addEventListener('click', () => {
-  const fid = els.folderIdInput.value.trim();
-  const key = els.apiKeyInput.value.trim();
-  if (!fid) { showToast('请输入文件夹 ID', 'error'); return; }
-  if (!key) { showToast('请输入 API Key', 'error'); return; }
-  state.folderId = fid;
-  state.apiKey = key;
-  saveConfig();
+function iconDownload() {
+  return `<svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+    <path d="M7.5 1v8M4.5 6l3 3 3-3M2 11v1a1 1 0 001 1h9a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function iconLink() {
+  return `<svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+    <path d="M6 9a3.5 3.5 0 005 0l2-2a3.5 3.5 0 00-5-4.95l-1 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M9 6a3.5 3.5 0 00-5 0L2 8a3.5 3.5 0 005 4.95l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>`;
+}
+
+// ─── Events ───────────────────────────────────────────────────────────
+// Config modal
+el.navSettings.addEventListener('click', openModal);
+el.stateBtn.addEventListener('click', openModal);
+el.modalX.addEventListener('click', closeModal);
+el.modalCancel.addEventListener('click', closeModal);
+el.overlay.addEventListener('click', e => { if (e.target === el.overlay) closeModal(); });
+
+el.modalSave.addEventListener('click', () => {
+  const fid = el.cfgFolder.value.trim();
+  const key = el.cfgKey.value.trim();
+  if (!fid) { toast('⚠ 请填写文件夹 ID'); return; }
+  if (!key) { toast('⚠ 请填写 API Key'); return; }
+  S.folderId = fid;
+  S.apiKey   = key;
+  saveCfg();
   closeModal();
   loadGallery();
 });
 
-// Filter tabs — "All" button
-$('tab-all').addEventListener('click', () => setCategory('all'));
-
-// Search
-let searchTimer;
-els.searchInput.addEventListener('input', e => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    state.searchQuery = e.target.value;
-    applyFilters();
-  }, 250);
-});
-
 // Lightbox
-els.lightboxClose.addEventListener('click', closeLightbox);
-els.lightboxPrev.addEventListener('click', () => lightboxNav(-1));
-els.lightboxNext.addEventListener('click', () => lightboxNav(1));
-els.lightbox.addEventListener('click', e => { if (e.target === els.lightbox) closeLightbox(); });
+el.lbClose.addEventListener('click', closeLb);
+el.lbPrev.addEventListener('click',  () => lbNav(-1));
+el.lbNext.addEventListener('click',  () => lbNav(1));
+el.lb.addEventListener('click', e => { if (e.target === el.lb) closeLb(); });
 
 // Keyboard
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (els.lightbox.classList.contains('open')) closeLightbox();
-    else if (els.configModal.classList.contains('open')) closeModal();
+    if (el.lb.classList.contains('open'))      { closeLb();    return; }
+    if (el.overlay.classList.contains('open')) { closeModal(); return; }
   }
-  if (els.lightbox.classList.contains('open')) {
-    if (e.key === 'ArrowLeft')  lightboxNav(-1);
-    if (e.key === 'ArrowRight') lightboxNav(1);
+  if (el.lb.classList.contains('open')) {
+    if (e.key === 'ArrowLeft')  lbNav(-1);
+    if (e.key === 'ArrowRight') lbNav(1);
   }
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────
 (function init() {
-  loadConfig();
-  if (state.folderId && state.apiKey) {
-    loadGallery();
-  } else {
-    showEmptyState();
-  }
+  loadCfg();
+  showState(S.folderId && S.apiKey ? 'loading' : 'empty');
+  if (S.folderId && S.apiKey) loadGallery();
 })();

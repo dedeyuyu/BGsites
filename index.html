@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BG Reference — 图片灵感库</title>
-  <meta name="description" content="沉浸式图片参考与灵感收集，按分类浏览 Google Drive 云端图库">
+  <title>BG 素材网站 - 内部使用</title>
+  <meta name="description" content="BG 素材内部图片库，按分类浏览 Google Drive 云端图库">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -13,48 +13,46 @@
 <body>
 
   <!-- ── Navigation ── -->
-  <header class="nav" id="nav">
+  <header class="nav">
     <div class="nav-inner">
-      <!-- Logo -->
       <div class="nav-logo">
-        <svg class="nav-logo-mark" width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <rect width="24" height="24" rx="6" fill="url(#lg)"/>
           <path d="M5 17l5-6 4 4.5 3-4 4 5.5H5z" fill="white" opacity=".9"/>
           <circle cx="17" cy="8" r="2.2" fill="white" opacity=".9"/>
           <defs>
             <linearGradient id="lg" x1="0" y1="0" x2="24" y2="24">
-              <stop stop-color="#6366F1"/>
-              <stop offset="1" stop-color="#A855F7"/>
+              <stop stop-color="#6366F1"/><stop offset="1" stop-color="#A855F7"/>
             </linearGradient>
           </defs>
         </svg>
-        <span class="nav-logo-text">BG Reference</span>
+        <span class="nav-logo-text">BG 素材网站</span>
+        <span class="nav-logo-tag">内部使用</span>
       </div>
 
-      <!-- Right actions -->
       <div class="nav-right">
-        <!-- Category toggle button -->
-        <button class="cat-toggle-btn" id="catToggleBtn" aria-expanded="false" aria-controls="catPanel" style="display:none">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path d="M1 3h13M3 7.5h9M5.5 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <!-- Category button — hidden until data loaded -->
+        <button class="cat-toggle-btn" id="catToggleBtn" style="display:none" aria-expanded="false">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 2.5h12M3 7h8M5.5 11.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
           </svg>
-          <span id="catToggleLabel">分类筛选</span>
-          <span class="cat-badge" id="catBadge" style="display:none">0</span>
-          <svg class="cat-chevron" id="catChevron" width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M2.5 4.5L6.5 8.5L10.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <span id="catBtnLabel">分类筛选</span>
+          <span class="cat-badge" id="catBadge"></span>
+          <svg class="cat-chevron" id="catChevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
 
-        <!-- Refresh cache button -->
-        <button class="nav-icon-btn" id="refreshBtn" title="刷新图片列表" style="display:none" aria-label="刷新">
+        <!-- Refresh -->
+        <button class="nav-icon-btn" id="refreshBtn" title="刷新列表（清除缓存）" style="display:none">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path d="M13 7A6 6 0 101 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            <path d="M13 3v4h-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M13 7.5A5.5 5.5 0 102 7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M13 3.5v4h-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
 
         <!-- Settings -->
-        <button class="nav-icon-btn" id="navSettings" aria-label="配置">
+        <button class="nav-icon-btn" id="navSettings">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/>
             <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -64,30 +62,51 @@
     </div>
   </header>
 
-  <!-- ── Category Panel (slides down from nav) ── -->
-  <div class="cat-panel" id="catPanel" aria-hidden="true">
-    <div class="cat-panel-inner">
-      <div class="cat-chips-wrap" id="catChipsWrap">
-        <!-- Chips injected by JS -->
-      </div>
-      <div class="cat-panel-foot">
-        <button class="cat-clear-btn" id="catClearBtn">
-          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-          清除筛选
+  <!-- ── Category Dropdown Panel ── -->
+  <div class="cat-panel" id="catPanel">
+    <div class="cat-panel-body">
+
+      <!-- Chips area (collapsible) -->
+      <div class="cat-chips-outer" id="catChipsOuter">
+        <div class="cat-chips-wrap" id="catChipsWrap">
+          <!-- Injected by JS -->
+        </div>
+        <!-- Expand/collapse button (shown when chips overflow) -->
+        <button class="cat-expand-btn" id="catExpandBtn" style="display:none">
+          <span id="catExpandLabel">展开全部</span>
+          <svg id="catExpandIcon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </button>
-        <span class="cat-result-count" id="catResultCount"></span>
+      </div>
+
+      <!-- Footer: clear + apply -->
+      <div class="cat-footer">
+        <div class="cat-footer-left">
+          <button class="cat-clear-btn" id="catClearBtn">
+            <svg width="11" height="11" viewBox="0 0 11 11"><path d="M1 1l9 9M10 1L1 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            清除选择
+          </button>
+          <span class="cat-sel-info" id="catSelInfo"></span>
+        </div>
+        <button class="cat-apply-btn" id="catApplyBtn">
+          更新显示
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M2 6.5h9M8 3l3.5 3.5L8 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
-  <!-- Panel backdrop (click to close) -->
+  <!-- click outside to close -->
   <div class="cat-backdrop" id="catBackdrop"></div>
 
   <!-- ── Config Modal ── -->
-  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true">
     <div class="modal">
       <div class="modal-head">
-        <p class="modal-title" id="modalTitle">配置 Google Drive</p>
-        <button class="modal-x" id="modalX" aria-label="关闭">
+        <p class="modal-title">配置 Google Drive</p>
+        <button class="modal-x" id="modalX">
           <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </button>
       </div>
@@ -110,11 +129,11 @@
   </div>
 
   <!-- ── Toast ── -->
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast"></div>
 
   <!-- ── Main ── -->
-  <main class="main" id="main">
-    <!-- Empty -->
+  <main class="main">
+
     <div class="state-box" id="stateEmpty">
       <div class="state-icon">
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
@@ -128,32 +147,40 @@
       <button class="btn-primary" id="stateBtn">立即配置</button>
     </div>
 
-    <!-- Loading -->
     <div class="state-box" id="stateLoading" style="display:none">
       <div class="loading-track"><div class="loading-fill" id="loadFill"></div></div>
-      <p class="state-desc" id="loadLabel">正在连接 Google Drive…</p>
+      <p class="state-desc" id="loadLabel">正在连接…</p>
     </div>
 
-    <!-- No results -->
     <div class="state-box" id="stateNone" style="display:none">
       <p class="state-title">没有图片</p>
-      <p class="state-desc">当前筛选条件下无图片，试试其他分类</p>
+      <p class="state-desc">当前筛选条件下无图片，请调整分类选择</p>
       <button class="btn-ghost" id="clearFilterBtn">清除筛选</button>
     </div>
 
-    <!-- Grid -->
     <div class="masonry" id="masonry" style="display:none"></div>
+
+    <!-- Sentinel for infinite scroll -->
+    <div id="sentinel" style="height:1px;margin-top:20px"></div>
+
+    <!-- Loading more indicator -->
+    <div class="load-more-tip" id="loadMoreTip" style="display:none">
+      <div class="load-more-dot"></div>
+      <div class="load-more-dot"></div>
+      <div class="load-more-dot"></div>
+    </div>
+
   </main>
 
   <!-- ── Lightbox ── -->
   <div class="lb" id="lb">
-    <button class="lb-close" id="lbClose" aria-label="关闭">
+    <button class="lb-close" id="lbClose">
       <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 1l12 12M13 1L1 13" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
     </button>
-    <button class="lb-nav lb-prev" id="lbPrev" aria-label="上一张">
+    <button class="lb-nav lb-prev" id="lbPrev">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 13L4 8l6-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
-    <button class="lb-nav lb-next" id="lbNext" aria-label="下一张">
+    <button class="lb-nav lb-next" id="lbNext">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 13l6-5-6-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <img class="lb-img" id="lbImg" src="" alt="">
